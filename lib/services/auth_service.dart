@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_service.dart';
@@ -29,21 +30,24 @@ class AuthService extends GetxService {
       });
 
       if (response.statusCode == 200) {
-        final data = response.data['data'];
-        String token = data['token'];
-        String name = data['user']['name'];
-
-        // Simpan Token & Nama
-        await _storage.write(key: 'auth_token', value: token);
-        await _storage.write(key: 'user_name', value: name);
-
-        isLoggedIn.value = true;
-        userName.value = name;
+        // ... simpan token ...
         return true;
       }
       return false;
-    } catch (e) {
-      rethrow; // Lempar error ke Controller untuk ditampilkan di UI
+
+    } on DioException catch (e) {
+      // Cek jika status 403 (Blocked)
+      if (e.response?.statusCode == 403) {
+        // Ambil pesan dari backend: "Akun Anda telah dibekukan..."
+        final msg = e.response?.data['message'] ?? "Akun diblokir";
+        throw Exception(msg);
+      }
+      // Cek error 401 (Salah password)
+      if (e.response?.statusCode == 401) {
+        throw Exception("Invalid email or password");
+      }
+
+      rethrow;
     }
   }
 

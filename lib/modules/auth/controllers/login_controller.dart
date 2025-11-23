@@ -12,10 +12,7 @@ class LoginController extends GetxController {
   final isLoading = false.obs;
 
   void login() async {
-    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      Get.snackbar("Error", "Email dan Password harus diisi", backgroundColor: Colors.red.withOpacity(0.5), colorText: Colors.white);
-      return;
-    }
+    // ... validasi input ...
 
     isLoading.value = true;
     try {
@@ -26,11 +23,25 @@ class LoginController extends GetxController {
 
       if (success) {
         Get.offAllNamed(Routes.DASHBOARD);
-      } else {
-        Get.snackbar("Login Gagal", "Periksa kembali email dan password Anda");
       }
     } catch (e) {
-      Get.snackbar("Error", "Terjadi kesalahan koneksi");
+      // Tangkap pesan error spesifik
+      String message = "Terjadi kesalahan koneksi";
+
+      // Jika errornya dari Auth Service (yang melempar string pesan error)
+      if (e.toString().contains("dibekukan") || e.toString().contains("BLOCKED")) {
+        message = "Akun Anda telah dibekukan. Hubungi Admin.";
+      } else if (e.toString().contains("Invalid")) {
+        message = "Email atau Password salah";
+      }
+
+      Get.snackbar(
+        "Login Gagal",
+        message,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        icon: const Icon(Icons.block, color: Colors.white),
+      );
     } finally {
       isLoading.value = false;
     }
