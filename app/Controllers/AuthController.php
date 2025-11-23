@@ -50,6 +50,11 @@ class AuthController extends ApiController
             return $this->error('Invalid email or password', 401);
         }
 
+        if ($user['status'] === 'BLOCKED') {
+            log_message('warning', 'Login blocked: User status is BLOCKED for email ' . $user['email']);
+            return $this->error('Akun Anda telah dibekukan. Silakan hubungi Admin.', 403); // 403 Forbidden
+        }
+
         // Generate JWT
         $key = getenv('JWT_SECRET') ?: 'rahasia_super_aman_investa_123';
         $payload = [

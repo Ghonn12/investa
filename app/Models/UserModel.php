@@ -12,7 +12,7 @@ class UserModel extends Model
     protected $returnType       = 'array';
     
     // PERBAIKAN: Tambahkan 'balance' agar saldo bisa diupdate
-    protected $allowedFields    = ['email', 'password', 'name', 'balance'];
+    protected $allowedFields    = ['email', 'password', 'name', 'balance', 'role', 'status'];
     
     protected $useTimestamps    = true;
 }

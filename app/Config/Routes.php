@@ -26,7 +26,19 @@ $routes->group('api', ['filter' => 'authFilter'], function($routes) {
     $routes->get('portfolio', 'Api\TradeController::portfolio');
     $routes->post('trade/buy', 'Api\TradeController::buy');  // Beli Saham
     $routes->post('trade/sell', 'Api\TradeController::sell'); // Jual Saham (BARU)
-    
+
     $routes->get('market/price', 'Api\TradeController::getPrice');
     $routes->get('market/stocks', 'Api\TradeController::getMarketStocks');
+});
+
+$routes->group('api/admin', ['filter' => 'authFilter'], function($routes) {
+    $routes->get('dashboard', 'Api\AdminController::dashboard');
+    $routes->get('user-growth', 'Api\AdminController::getUserGrowth');
+    
+    $routes->get('users', 'Api\AdminController::users');
+    $routes->post('users', 'Api\AdminController::createUser');
+    $routes->put('users/(:num)', 'Api\AdminController::updateUser/$1');
+    $routes->delete('users/(:num)', 'Api\AdminController::deleteUser/$1');
+
+    $routes->get('transactions', 'Api\TransactionAdminController::index'); 
 });
