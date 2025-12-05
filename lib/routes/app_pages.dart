@@ -26,7 +26,7 @@ import '../modules/profile/controllers/profile_controller.dart';
 import '../modules/history/controllers/history_controller.dart';
 
 // Import Services yang dibutuhkan untuk LazyPut
-import '../../services/finance_service.dart';
+import '../services/finance_service2.dart';
 import '../../services/trade_service.dart';
 import '../../services/ai_service.dart';
 

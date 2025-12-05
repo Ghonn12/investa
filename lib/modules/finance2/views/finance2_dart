@@ -1,0 +1,45 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../controllers/finance2_controller.dart';
+import 'add_sheet.dart';
+
+class Finance2View extends StatelessWidget {
+  final controller = Get.put(Finance2Controller());
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Finance Sakuku")),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.add),
+        onPressed: () => Get.bottomSheet(AddSheet()),
+      ),
+      body: Obx(() {
+        if(controller.isLoading.value) return Center(child: CircularProgressIndicator());
+        if(controller.transactions.isEmpty) return Center(child: Text("Kosong"));
+
+        return ListView.separated(
+          itemCount: controller.transactions.length,
+          separatorBuilder: (c,i) => Divider(),
+          itemBuilder: (ctx, i) {
+            var trx = controller.transactions[i];
+            bool income = trx.tipe == 'Pemasukan';
+            return Dismissible(
+              key: Key(trx.id.toString()),
+              onDismissed: (_) => controller.delete(trx.id),
+              background: Container(color: Colors.red, child: Icon(Icons.delete, color: Colors.white)),
+              child: ListTile(
+                title: Text(trx.deskripsi),
+                subtitle: Text("${trx.kategoriNama} | ${trx.walletNama}\n${trx.date}"),
+                trailing: Text(
+                  "Rp ${trx.amount}",
+                  style: TextStyle(color: income ? Colors.green : Colors.red, fontWeight: FontWeight.bold),
+                ),
+              ),
+            );
+          },
+        );
+      }),
+    );
+  }
+}

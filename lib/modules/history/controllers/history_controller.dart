@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import 'dart:developer';
-import '../../../services/finance_service.dart';
+import '../../../services/finance_service2.dart';
 import '../../../models/transaction_model.dart';
 
 class HistoryController extends GetxController {
