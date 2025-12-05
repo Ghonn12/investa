@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-// Import semua View
+// View & Controller Lain
 import '../modules/splash/views/splash_view.dart';
 import '../modules/auth/views/login_view.dart';
 import '../modules/auth/views/register_view.dart';
@@ -13,7 +13,11 @@ import '../modules/chat_ai/views/chat_ai_view.dart';
 import '../modules/profile/views/profile_view.dart';
 import '../modules/history/views/history_view.dart';
 
-// Import semua Controller
+// FINANCE 2 (PUNYA KITA)
+import '../modules/finance2/views/finance2_view.dart';
+import '../modules/finance2/controllers/finance2_controller.dart';
+
+// Controller Lain
 import '../modules/splash/controllers/splash_controller.dart';
 import '../modules/auth/controllers/login_controller.dart';
 import '../modules/auth/controllers/register_controller.dart';
@@ -25,8 +29,9 @@ import '../modules/chat_ai/controllers/chat_ai_controller.dart';
 import '../modules/profile/controllers/profile_controller.dart';
 import '../modules/history/controllers/history_controller.dart';
 
-// Import Services yang dibutuhkan untuk LazyPut
-import '../services/finance_service2.dart';
+// Services
+import '../services/finance_service.dart';  // Service lama
+import '../services/finance_service2.dart'; // Service baru
 import '../../services/trade_service.dart';
 import '../../services/ai_service.dart';
 
@@ -66,24 +71,35 @@ class AppPages {
       name: Routes.DASHBOARD,
       page: () => const DashboardView(),
       binding: BindingsBuilder(() {
-        // Dashboard butuh TradeService untuk Net Worth
         Get.lazyPut(() => TradeService());
         Get.lazyPut(() => DashboardController());
       }),
     ),
 
-    // 4. Finance (Keuangan)
+    // 4. Finance (Punya goni - LAMA)
     GetPage(
       name: Routes.FINANCE,
       page: () => const FinanceView(),
       binding: BindingsBuilder(() {
-        // Inisialisasi Service dulu baru Controller
         Get.lazyPut(() => FinanceService());
         Get.lazyPut(() => FinanceController());
       }),
     ),
 
-    // 5. Market (Trading List)
+    // ==========================================
+    // 4.5. Finance Sakuku (Punya fajr - BARU)
+    // ==========================================
+    GetPage(
+      name: Routes.FINANCE_SAKUKU,
+      page: () => Finance2View(), 
+      binding: BindingsBuilder(() {
+        // Gunakan Service 2 & Controller 2
+        Get.lazyPut(() => FinanceService2()); 
+        Get.lazyPut(() => Finance2Controller());
+      }),
+    ),
+
+    // 5. Market
     GetPage(
       name: Routes.MARKET,
       page: () => const MarketView(),
@@ -93,7 +109,7 @@ class AppPages {
       }),
     ),
 
-    // 6. Portfolio (Aset User)
+    // 6. Portfolio
     GetPage(
       name: Routes.PORTFOLIO,
       page: () => const PortfolioView(),
@@ -103,7 +119,7 @@ class AppPages {
       }),
     ),
 
-    // 7. AI Chat Assistant
+    // 7. AI Chat
     GetPage(
       name: Routes.CHAT_AI,
       page: () => const ChatAiView(),
@@ -113,7 +129,7 @@ class AppPages {
       }),
     ),
 
-    // 8. Profile & Settings
+    // 8. Profile
     GetPage(
       name: Routes.PROFILE,
       page: () => const ProfileView(),
@@ -121,12 +137,13 @@ class AppPages {
         Get.lazyPut(() => ProfileController());
       }),
     ),
+
     // 9. History
     GetPage(
       name: Routes.HISTORY,
       page: () => const HistoryView(),
       binding: BindingsBuilder(() {
-        Get.lazyPut(() => FinanceService());   // <--- tambahkan ini
+        Get.lazyPut(() => FinanceService2()); 
         Get.lazyPut(() => HistoryController());
       }),
     ),

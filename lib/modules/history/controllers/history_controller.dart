@@ -1,12 +1,17 @@
 import 'package:get/get.dart';
 import 'dart:developer';
-import '../../../services/finance_service2.dart';
-import '../../../models/transaction_model.dart';
+// Import Service 2 (Sakuku)
+import '../../../services/finance_service2.dart'; 
+// Import Model V2 (PENTING: Pakai model V2 agar cocok dengan data service)
+import '../../../models/transaction_model_v2.dart'; 
 
 class HistoryController extends GetxController {
-  final FinanceService _financeService = Get.find();
+  // Gunakan Service 2
+  final FinanceService2 _financeService = Get.find<FinanceService2>();
 
-  var transactions = <TransactionModel>[].obs;
+  // GANTI TIPE DATA JADI V2
+  var transactions = <TransactionModelV2>[].obs; 
+  
   var isLoading = true.obs;
 
   @override
@@ -18,6 +23,7 @@ class HistoryController extends GetxController {
   Future<void> fetchTransactions() async {
     try {
       isLoading.value = true;
+      // Sekarang tipe datanya cocok (sama-sama V2)
       final data = await _financeService.getTransactions();
       transactions.assignAll(data);
       log("[History] Fetched ${data.length} transactions.");

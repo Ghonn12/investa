@@ -8,14 +8,19 @@ class ApiConstants {
   // Auth Endpoints
   static const String login = "/auth/login";
   static const String register = "/auth/register";
-  static const String profile  = "/auth/profile";
+  static const String profile = "/auth/profile";
 
   // Feature Endpoints
-  static const String finance = "/api/finance";
+  // static const String finance = "/api/finance";
   static const String portfolio = "/api/portfolio";
   static const String tradeBuy = "/api/trade/buy";
   static const String tradeSell = "/api/trade/sell";
   static const String chat = "/api/chat";
+
+  static const String finance = "$baseUrl/api/finance"; // Punya temanmu
+  static const String transaksi = "$baseUrl/api/transaksi"; // Punya kita
+  static const String wallet = "$baseUrl/api/wallet";
+  static const String kategori = "$baseUrl/api/kategori";
 
   // Market Data Endpoints (Yang baru kita tambahkan)
   static const String marketPrice = "/api/market/price";

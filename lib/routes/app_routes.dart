@@ -8,6 +8,7 @@ abstract class Routes {
   static const MARKET = '/market';
   static const PORTFOLIO = '/portfolio';
   static const FINANCE = '/finance';
+  static const FINANCE_SAKUKU = '/finance-sakuku';
   static const HISTORY = '/history';
   static const CHAT_AI = '/chat_ai';
   static const PROFILE = '/profile';

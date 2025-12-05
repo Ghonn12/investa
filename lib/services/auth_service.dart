@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_service.dart';
-import '../core/values/api_constants.dart';
+import '../../core/values/api_constants.dart'; // Sesuaikan path ini jika merah
 
 class AuthService extends GetxService {
   final ApiService _api = Get.find();
@@ -12,12 +12,17 @@ class AuthService extends GetxService {
   final userName = ''.obs;
   final userEmail = ''.obs;
 
+  // --- TAMBAHAN PENTING (Agar bisa dibaca FinanceService) ---
+  String? _token; 
+  String? get token => _token; 
+  // ----------------------------------------------------------
+
   Future<AuthService> init() async {
     // Cek token saat aplikasi dimulai
-    final token = await _storage.read(key: 'auth_token');
-    if (token != null) {
+    _token = await _storage.read(key: 'auth_token'); // Simpan ke variabel memory
+    
+    if (_token != null) {
       isLoggedIn.value = true;
-      // Ambil profile user dari API supaya nama/email tidak kosong
       await fetchProfile();
     }
     return this;
@@ -25,14 +30,20 @@ class AuthService extends GetxService {
 
   Future<void> fetchProfile() async {
     try {
-      final response = await _api.get(ApiConstants.profile);
+      final response = await _api.get(ApiConstants.profile); 
+      // Note: Pastikan ApiConstants.profile mengarah ke endpoint yang benar (misal '/auth/me' atau '/users/profile')
+      // Jika belum ada endpoint profile, skip bagian ini dulu gapapa.
+      
       if (response.statusCode == 200) {
-        final user = response.data['data'];
+        // Sesuaikan parsing JSON dengan struktur API kamu
+        // Jika API return { data: { user: {...} } } atau { user: {...} }
+        final data = response.data;
+        final user = data['data'] ?? data['user'] ?? data; 
+        
         userName.value = user['name'] ?? 'User Investa';
         userEmail.value = user['email'] ?? '';
       }
     } catch (e) {
-      // kalau gagal, tetap fallback
       userName.value = 'User Investa';
       userEmail.value = '';
     }
@@ -40,48 +51,62 @@ class AuthService extends GetxService {
 
   Future<bool> login(String email, String password) async {
     try {
-      final response = await _api.post(ApiConstants.login, data: {
+      // Pastikan path ApiConstants.login benar
+      final response = await _api.post('/auth/login', data: { 
         'email': email,
         'password': password,
       });
 
       if (response.statusCode == 200) {
-        final data = response.data['data'];
-        final token = data['token'];
+        // Sesuaikan dengan struktur JSON dari AuthController CI4 kamu
+        // Controller kamu return: { status: true, message: '...', token: '...', user: {...} }
+        // Jadi TIDAK ADA key ['data']. Langsung ambil dari root response.
+        
+        final data = response.data; 
+        
+        // Cek struktur response (kadang ada di dalam 'data', kadang langsung)
+        final token = data['token'] ?? data['data']?['token'];
+        final user = data['user'] ?? data['data']?['user'];
 
-        await _storage.write(key: 'auth_token', value: token);
-        userName.value = data['user']['name'] ?? 'User Investa';
-        userEmail.value = data['user']['email'] ?? '';
-        isLoggedIn.value = true;
+        if (token != null) {
+          // Simpan ke Storage & Memory
+          await _storage.write(key: 'auth_token', value: token);
+          _token = token; // Update variabel memory
 
-        return true;
+          if (user != null) {
+            userName.value = user['name'] ?? 'User';
+            userEmail.value = user['email'] ?? '';
+          }
+          
+          isLoggedIn.value = true;
+          return true;
+        }
       }
       return false;
     } catch (e) {
+      // print("Login Error: $e"); // Debugging
       rethrow;
     }
   }
 
   Future<void> logout() async {
     await _storage.delete(key: 'auth_token');
+    _token = null; // Hapus dari memory
     userName.value = '';
     userEmail.value = '';
     isLoggedIn.value = false;
-    Get.offAllNamed('/login'); // gunakan constant route
+    Get.offAllNamed('/login'); 
   }
 
   Future<bool> register(String name, String email, String password) async {
     try {
-      final response = await _api.post(ApiConstants.register, data: {
+      final response = await _api.post('/auth/register', data: {
         'name': name,
         'email': email,
         'password': password,
       });
 
-      if (response.statusCode == 201) {
-        // langsung isi data user agar tidak kosong
-        userName.value = name;
-        userEmail.value = email;
+      if (response.statusCode == 201 || response.statusCode == 200) {
         return true;
       }
       return false;
