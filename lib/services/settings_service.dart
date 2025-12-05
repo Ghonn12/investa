@@ -14,13 +14,14 @@ class SettingsService extends GetxService {
   static const String _onboardingKey = 'onboardingDone';
 
   // Reactive states
-  var isDarkMode = false.obs;
-  var currency = 'IDR'.obs;
-  var language = 'id'.obs; // default bahasa Indonesia
-  var notificationsEnabled = true.obs;
-  var fontSize = 14.0.obs;
-  var onboardingDone = false.obs;
+  final isDarkMode = false.obs;
+  final currency = 'IDR'.obs;
+  final language = 'id'.obs; // default bahasa Indonesia
+  final notificationsEnabled = true.obs;
+  final fontSize = 14.0.obs;
+  final onboardingDone = false.obs;
 
+  /// Inisialisasi service dan load preferences
   Future<SettingsService> init() async {
     _prefs = await SharedPreferences.getInstance();
 
@@ -32,8 +33,11 @@ class SettingsService extends GetxService {
     fontSize.value = _prefs.getDouble(_fontSizeKey) ?? 14.0;
     onboardingDone.value = _prefs.getBool(_onboardingKey) ?? false;
 
-    // Apply theme
-    Get.changeThemeMode(isDarkMode.value ? ThemeMode.dark : ThemeMode.light);
+    // Apply theme sesuai dark mode
+    _applyTheme();
+
+    // Apply locale sesuai bahasa
+    _applyLocale();
 
     return this;
   }
@@ -42,7 +46,11 @@ class SettingsService extends GetxService {
   void toggleDarkMode(bool isDark) {
     isDarkMode.value = isDark;
     _prefs.setBool(_darkModeKey, isDark);
-    Get.changeThemeMode(isDark ? ThemeMode.dark : ThemeMode.light);
+    _applyTheme();
+  }
+
+  void _applyTheme() {
+    Get.changeThemeMode(isDarkMode.value ? ThemeMode.dark : ThemeMode.light);
   }
 
   // ---------------- Currency ----------------
@@ -55,8 +63,12 @@ class SettingsService extends GetxService {
   Future<void> setLanguage(String newLang) async {
     language.value = newLang;
     await _prefs.setString(_languageKey, newLang);
-    // Bisa integrasi dengan GetX localization
-    Get.updateLocale(Locale(newLang));
+    _applyLocale();
+  }
+
+  void _applyLocale() {
+    final langCode = language.value;
+    Get.updateLocale(Locale(langCode));
   }
 
   // ---------------- Notifications ----------------

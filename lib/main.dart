@@ -9,22 +9,22 @@ import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/settings_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 2. Inisialisasi Format Tanggal Indonesia (Wajib)
   await initializeDateFormatting('id_ID', null);
 
-  // 3. Init Services
   try {
-    await Get.putAsync(() => SettingsService().init());
-    await Get.putAsync(() => NotificationService().init());
-    await Get.putAsync(() => ApiService().init());
-    await Get.putAsync(() => AuthService().init());
+    // Registrasi semua service yang butuh init async
+    await Get.putAsync<ApiService>(() async => await ApiService().init());
+    await Get.putAsync<AuthService>(() async => await AuthService().init());
+    await Get.putAsync<SettingsService>(() async => await SettingsService().init());
+    await Get.putAsync<NotificationService>(() async => await NotificationService().init());
   } catch (e) {
     debugPrint("Service init error: $e");
   }
-
 
   runApp(const InvestaApp());
 }

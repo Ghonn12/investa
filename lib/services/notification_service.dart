@@ -47,7 +47,7 @@ class NotificationService extends GetxService {
     await notificationsPlugin.show(id, title, body, platformDetails);
   }
 
-  /// Jadwal notifikasi sekali di waktu tertentu
+  /// Jadwal notifikasi sekali di waktu tertentu (non-exact)
   Future<void> scheduleNotification({
     required int id,
     required String title,
@@ -76,15 +76,16 @@ class NotificationService extends GetxService {
       platformDetails,
       uiLocalNotificationDateInterpretation:
       UILocalNotificationDateInterpretation.absoluteTime,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle, // ✅ aman
     );
   }
 
-  /// Jadwal notifikasi market buka/tutup
+  /// Jadwal notifikasi market buka/tutup (non-exact, daily repeat)
   Future<void> scheduleMarketNotifications() async {
     final now = tz.TZDateTime.now(tz.local);
 
-    Future<void> _schedule(int id, String title, String body, int hour, int minute) async {
+    Future<void> _schedule(
+        int id, String title, String body, int hour, int minute) async {
       tz.TZDateTime scheduledDate =
       tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
 
@@ -111,8 +112,8 @@ class NotificationService extends GetxService {
         platformDetails,
         uiLocalNotificationDateInterpretation:
         UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time, // ✅ repeat harian
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle, // ✅ aman
       );
       log("📌 Market Notification set for $hour:$minute");
     }
