@@ -17,160 +17,133 @@ class MarketView extends GetView<MarketController> {
         title: const Text("Market"),
         centerTitle: true,
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        // Menggunakan list popularSymbols dari controller
-        itemCount: controller.popularSymbols.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final stock = controller.popularSymbols[index];
-          final symbol = stock['symbol'] as String;
-          final name = stock['name'] as String;
+      body: Obx(() {
+        // ... (Logika Loading dan Empty State) ...
+        if (controller.stockPrices.isEmpty && controller.isLoadingAction.value == false) {
+          if (controller.popularSymbols.isEmpty) {
+            return const Center(child: Text("No market symbols available."));
+          }
+        }
 
-          return GestureDetector(
-            onTap: () {
-              // 1. Ambil harga terakhir yang sudah di-fetch (atau 0 jika belum)
-              final currentPrice = controller.stockPrices[symbol] ?? 0.0;
+        if (controller.stockPrices.isEmpty && controller.popularSymbols.isNotEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-              // 2. Kirim data ke controller untuk persiapan BottomSheet
-              controller.openTradeSheet(symbol, name, currentPrice);
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: controller.popularSymbols.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final stock = controller.popularSymbols[index];
+            final symbol = stock['symbol'] as String;
+            final name = stock['name'] as String;
 
-              // 3. Buka BottomSheet
-              Get.bottomSheet(
-                StockDetailBottomSheet(
-                  symbol: symbol,
-                  name: name,
-                  price: currentPrice, // Kirim harga awal agar langsung tampil
+            // --- FIX 1: Ambil Map data lengkap ---
+            final stockData = controller.stockPrices[symbol] ?? {};
+
+            // --- FIX 2: Akses nilai 'price' di dalam Map dengan aman ---
+            // Pastikan konversi ke String lalu ke double
+            final price = double.tryParse(stockData['price']?.toString() ?? '0.0') ?? 0.0;
+
+            // --- AKSES DATA PERUBAHAN ---
+            final changePercent = double.tryParse(stockData['change_percent']?.toString() ?? '0.00') ?? 0.00;
+            final isUp = stockData['is_up'] ?? false;
+
+            final changeText = "${isUp && changePercent != 0 ? '+' : ''}${changePercent.toStringAsFixed(2)}%";
+
+
+            return GestureDetector(
+              onTap: () {
+                // 1. Kirim harga yang sudah dikonversi dan pasti double
+                controller.openTradeSheet(symbol, name, price);
+
+                // 2. Buka BottomSheet
+                Get.bottomSheet(
+                  StockDetailBottomSheet(
+                    symbol: symbol,
+                    name: name,
+                    price: price, // Kirim harga yang sudah pasti double
+                  ),
+                  isScrollControlled: true,
+                  backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
                 ),
-                isScrollControlled: true,
-                backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDark : Colors.white,
-                borderRadius: BorderRadius.circular(16), // Lebih rounded (modern)
-                border: Border.all(
-                    color: isDark ? AppColors.borderDark : AppColors.borderLight
-                ),
-                // Opsional: Shadow halus agar card lebih "pop"
-                boxShadow: isDark ? [] : [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  )
-                ],
-              ),
-              child: Row(
-                children: [
-                  // 1. Icon Saham (Inisial)
-                  CircleAvatar(
-                    radius: 24, // Sedikit lebih besar
-                    backgroundColor: isDark ? Colors.grey[800] : Colors.grey[100],
-                    child: Text(
-                      symbol[0],
-                      style: TextStyle(
-                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                child: Row(
+                  children: [
+                    // ... (Icon dan Simbol) ...
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(symbol, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.textPrimaryLight)),
+                          Text(name, style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : AppColors.textSecondaryLight, overflow: TextOverflow.ellipsis), maxLines: 1,),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
+                    // HARGA DAN PERSENTASE
+                    Obx(() {
+                      // Gunakan stockData yang sudah dihitung di luar Obx jika memungkinkan
+                      // Namun, untuk memastikan reaktif, kita panggil controller.stockPrices[symbol] lagi
+                      final liveData = controller.stockPrices[symbol] ?? {};
+                      final livePrice = double.tryParse(liveData['price']?.toString() ?? '0.0') ?? 0.0;
+                      final liveChangePercent = double.tryParse(liveData['change_percent']?.toString() ?? '0.00') ?? 0.00;
+                      final liveIsUp = liveData['is_up'] ?? false;
+                      final liveChangeText = "${liveIsUp && liveChangePercent != 0 ? '+' : ''}${liveChangePercent.toStringAsFixed(2)}%";
 
-                  // 2. Nama & Simbol
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          symbol,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+
+                      // Jika harga masih 0 (sedang loading), tampilkan spinner kecil
+                      if (livePrice == 0) {
+                        return const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary
+                            )
+                        );
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            CurrencyFormat.toIdr(livePrice),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? Colors.grey[400] : AppColors.textSecondaryLight,
-                            overflow: TextOverflow.ellipsis, // Cegah overflow text panjang
+                          const SizedBox(height: 4),
+                          // Persentase
+                          Text(
+                            liveChangeText,
+                            style: TextStyle(
+                              color: liveIsUp ? AppColors.success : AppColors.error,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
                           ),
-                          maxLines: 1,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // 3. HARGA SAHAM (Real-time via Obx)
-                  Obx(() {
-                    // Ambil harga dari map di controller
-                    final price = controller.stockPrices[symbol] ?? 0.0;
-
-                    // Jika harga masih 0 (sedang loading), tampilkan spinner kecil
-                    if (price == 0) {
-                      return const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.primary
-                          )
+                        ],
                       );
-                    }
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          CurrencyFormat.toIdr(price),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary, // Warna Navy Blue agar menonjol
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        // Label "Live" kecil
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                              color: AppColors.success.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4)
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.fiber_manual_record, size: 8, color: AppColors.success),
-                              SizedBox(width: 4),
-                              Text(
-                                "Live",
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: AppColors.success,
-                                    fontWeight: FontWeight.bold
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      ],
-                    );
-                  }),
-                ],
+                    }),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
-      ),
+            );
+          },
+        );
+      }),
     );
   }
 }

@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:developer'; // <--- tambahkan ini
 import '../../../../services/finance_service.dart';
 import '../../../../models/transaction_model.dart';
 import '../../../../widgets/error_snackbar.dart';
-// 1. Import DashboardController agar bisa dipanggil
 import '../../dashboard/controllers/dashboard_controller.dart';
+import '../../../../services/notification_service.dart';
 
 class FinanceController extends GetxController {
   final FinanceService _financeService = Get.find();
-
+  final NotificationService _notificationService = Get.find();
   var transactions = <TransactionModel>[].obs;
   var isLoading = true.obs;
   var isSubmitting = false.obs;
@@ -23,19 +24,6 @@ class FinanceController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    fetchTransactions();
-  }
-
-  void fetchTransactions() async {
-    try {
-      isLoading.value = true;
-      final data = await _financeService.getTransactions();
-      transactions.assignAll(data);
-    } catch (e) {
-      print(e);
-    } finally {
-      isLoading.value = false;
-    }
   }
 
   void addTransaction() async {
@@ -46,7 +34,9 @@ class FinanceController extends GetxController {
 
     isSubmitting.value = true;
     try {
-      double amount = double.tryParse(amountController.text.replaceAll(',', '').replaceAll('.', '')) ?? 0;
+      double amount = double.tryParse(
+          amountController.text.replaceAll(RegExp(r'[^0-9.]'), '')
+      ) ?? 0;
 
       final success = await _financeService.addTransaction(
         title: titleController.text,
@@ -58,23 +48,18 @@ class FinanceController extends GetxController {
 
       if (success) {
         AppSnackbars.showSuccess("Transaksi berhasil disimpan");
-        Get.back(); // Tutup BottomSheet
-
-        // Refresh list di halaman ini
-        fetchTransactions();
+        Get.back();
         _resetForm();
 
-        // 2. UPDATE DASHBOARD (Agar saldo berubah real-time)
-        // Kita cek apakah DashboardController sedang aktif di memori
         if (Get.isRegistered<DashboardController>()) {
           Get.find<DashboardController>().fetchDashboardData();
         }
-
       } else {
         AppSnackbars.showError("Gagal menyimpan transaksi");
       }
-    } catch (e) {
+    } catch (e, s) {
       AppSnackbars.showError("Terjadi kesalahan: $e");
+      debugPrintStack(stackTrace: s);
     } finally {
       isSubmitting.value = false;
     }
@@ -86,5 +71,13 @@ class FinanceController extends GetxController {
     categoryController.clear();
     selectedType.value = 'EXPENSE';
     selectedDate.value = DateTime.now();
+  }
+
+  @override
+  void onClose() {
+    titleController.dispose();
+    amountController.dispose();
+    categoryController.dispose();
+    super.onClose();
   }
 }

@@ -11,6 +11,7 @@ import '../modules/market/views/market_view.dart';
 import '../modules/portfolio/views/portfolio_view.dart';
 import '../modules/chat_ai/views/chat_ai_view.dart';
 import '../modules/profile/views/profile_view.dart';
+import '../modules/history/views/history_view.dart';
 
 // Import semua Controller
 import '../modules/splash/controllers/splash_controller.dart';
@@ -22,6 +23,7 @@ import '../modules/market/controllers/market_controller.dart';
 import '../modules/portfolio/controllers/portfolio_controller.dart';
 import '../modules/chat_ai/controllers/chat_ai_controller.dart';
 import '../modules/profile/controllers/profile_controller.dart';
+import '../modules/history/controllers/history_controller.dart';
 
 // Import Services yang dibutuhkan untuk LazyPut
 import '../../services/finance_service.dart';
@@ -117,6 +119,15 @@ class AppPages {
       page: () => const ProfileView(),
       binding: BindingsBuilder(() {
         Get.lazyPut(() => ProfileController());
+      }),
+    ),
+    // 9. History
+    GetPage(
+      name: Routes.HISTORY,
+      page: () => const HistoryView(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => FinanceService());   // <--- tambahkan ini
+        Get.lazyPut(() => HistoryController());
       }),
     ),
   ];

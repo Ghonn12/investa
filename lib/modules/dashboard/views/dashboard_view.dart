@@ -91,7 +91,7 @@ class DashboardView extends GetView<DashboardController> {
                 children: [
                   _buildMenuItem(context, Icons.add_card, "Top Up", () => Get.toNamed(Routes.FINANCE)),
                   _buildMenuItem(context, Icons.pie_chart_outline, "Portfolio", () => Get.toNamed(Routes.PORTFOLIO)),
-                  _buildMenuItem(context, Icons.history, "History", () => Get.toNamed(Routes.FINANCE)),
+                  _buildMenuItem(context, Icons.history, "History", () => Get.toNamed(Routes.HISTORY)),
                   _buildMenuItem(context, Icons.smart_toy_outlined, "Chat AI", () => Get.toNamed(Routes.CHAT_AI)),
                 ],
               ),
@@ -108,7 +108,7 @@ class DashboardView extends GetView<DashboardController> {
               ),
               const SizedBox(height: 16),
 
-              // 4. Horizontal List (DATA ASLI)
+              // 4. Horizontal List (DATA ASLI DARI CONTROLLER)
               SizedBox(
                 height: 140,
                 child: Obx(() {
@@ -127,14 +127,16 @@ class DashboardView extends GetView<DashboardController> {
                       final stock = controller.marketMovers[index];
                       final symbol = stock['symbol'] ?? '';
                       final name = stock['name'] ?? '';
-                      final price = double.tryParse(stock['price'].toString()) ?? 0.0;
+                      final price = double.tryParse(stock['price']?.toString() ?? '0.0') ?? 0.0;
 
-                      // UPDATE: Set ke 0.00% jika ingin netral (karena libur/data API belum ada)
-                      // Nanti jika API sudah support 'change', kita ambil dari variable stock['change']
-                      final change = "0.00%";
-                      final isUp = true; // Warna hijau (atau bisa dibuat abu-abu)
+                      // --- MENGAMBIL DATA PERUBAHAN DARI BACKEND ---
+                      final changePercent = double.tryParse(stock['change_percent']?.toString() ?? '0.00') ?? 0.00;
+                      final isUp = stock['is_up'] ?? true;
 
-                      return _buildMarketCard(context, symbol, name, CurrencyFormat.toIdr(price), change, isUp);
+                      final changeText = "${isUp && changePercent != 0 ? '+' : ''}${changePercent.toStringAsFixed(2)}%";
+                      // ------------------------------------------
+
+                      return _buildMarketCard(context, symbol, name, CurrencyFormat.toIdr(price), changeText, isUp);
                     },
                   );
                 }),

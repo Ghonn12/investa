@@ -7,7 +7,8 @@ import 'core/theme/app_theme.dart';
 import 'routes/app_pages.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
-
+import 'services/notification_service.dart';
+import 'services/settings_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -15,8 +16,15 @@ void main() async {
   await initializeDateFormatting('id_ID', null);
 
   // 3. Init Services
-  await Get.putAsync(() => ApiService().init());
-  await Get.putAsync(() => AuthService().init());
+  try {
+    await Get.putAsync(() => SettingsService().init());
+    await Get.putAsync(() => NotificationService().init());
+    await Get.putAsync(() => ApiService().init());
+    await Get.putAsync(() => AuthService().init());
+  } catch (e) {
+    debugPrint("Service init error: $e");
+  }
+
 
   runApp(const InvestaApp());
 }

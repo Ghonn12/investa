@@ -21,24 +21,26 @@ class ApiService extends GetxService {
 
     // Add Interceptors
     _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        // Ambil token dari storage
-        final token = await _storage.read(key: 'auth_token');
-        if (token != null) {
-          options.headers['Authorization'] = 'Bearer $token';
+        onRequest: (options, handler) async {
+          // FIX: Ambil token dengan key 'auth_token'
+          final token = await _storage.read(key: 'auth_token');
+          if (token != null) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          return handler.next(options);
+        },
+        onError: (DioException e, handler) {
+          // FIX: Logic Logout jika 401
+          if (e.response?.statusCode == 401) {
+            // Hanya tampilkan snackbar jika bukan sedang di halaman Login
+            if (Get.currentRoute != '/login') {
+              Get.snackbar("Sesi Berakhir", "Silakan login kembali.");
+            }
+            // Biarkan intereceptor di Auth Service yang handle redirect
+          }
+          return handler.next(e);
         }
-        return handler.next(options);
-      },
-      onError: (DioException e, handler) {
-        // Handle Global Error (Misal: 401 Unauthorized -> Logout)
-        if (e.response?.statusCode == 401) {
-          Get.snackbar("Session Expired", "Please login again");
-          Get.offAllNamed('/login');
-        }
-        return handler.next(e);
-      },
     ));
-
     return this;
   }
 

@@ -4,10 +4,11 @@ class ApiConstants {
   // Jika Anda memakai iOS Simulator, ganti dengan localhost
   static const String baseUrl = "http://10.0.2.2:8081";
   // static const String baseUrl = "http://localhost:8081"; // Untuk iOS Simulator
-
+  // static const String baseUrl = "http://192.168.216.122:8081";
   // Auth Endpoints
   static const String login = "/auth/login";
   static const String register = "/auth/register";
+  static const String profile  = "/auth/profile";
 
   // Feature Endpoints
   static const String finance = "/api/finance";

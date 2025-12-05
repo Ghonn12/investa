@@ -8,18 +8,34 @@ class AuthService extends GetxService {
   final ApiService _api = Get.find();
   final _storage = const FlutterSecureStorage();
 
-  // Reactive variable untuk status login
   final isLoggedIn = false.obs;
   final userName = ''.obs;
+  final userEmail = ''.obs;
 
   Future<AuthService> init() async {
     // Cek token saat aplikasi dimulai
-    String? token = await _storage.read(key: 'auth_token');
+    final token = await _storage.read(key: 'auth_token');
     if (token != null) {
       isLoggedIn.value = true;
-      // Opsional: Ambil data user profile di sini jika perlu
+      // Ambil profile user dari API supaya nama/email tidak kosong
+      await fetchProfile();
     }
     return this;
+  }
+
+  Future<void> fetchProfile() async {
+    try {
+      final response = await _api.get(ApiConstants.profile);
+      if (response.statusCode == 200) {
+        final user = response.data['data'];
+        userName.value = user['name'] ?? 'User Investa';
+        userEmail.value = user['email'] ?? '';
+      }
+    } catch (e) {
+      // kalau gagal, tetap fallback
+      userName.value = 'User Investa';
+      userEmail.value = '';
+    }
   }
 
   Future<bool> login(String email, String password) async {
@@ -30,25 +46,28 @@ class AuthService extends GetxService {
       });
 
       if (response.statusCode == 200) {
-        // ... simpan token ...
+        final data = response.data['data'];
+        final token = data['token'];
+
+        await _storage.write(key: 'auth_token', value: token);
+        userName.value = data['user']['name'] ?? 'User Investa';
+        userEmail.value = data['user']['email'] ?? '';
+        isLoggedIn.value = true;
+
         return true;
       }
       return false;
-
-    } on DioException catch (e) {
-      // Cek jika status 403 (Blocked)
-      if (e.response?.statusCode == 403) {
-        // Ambil pesan dari backend: "Akun Anda telah dibekukan..."
-        final msg = e.response?.data['message'] ?? "Akun diblokir";
-        throw Exception(msg);
-      }
-      // Cek error 401 (Salah password)
-      if (e.response?.statusCode == 401) {
-        throw Exception("Invalid email or password");
-      }
-
+    } catch (e) {
       rethrow;
     }
+  }
+
+  Future<void> logout() async {
+    await _storage.delete(key: 'auth_token');
+    userName.value = '';
+    userEmail.value = '';
+    isLoggedIn.value = false;
+    Get.offAllNamed('/login'); // gunakan constant route
   }
 
   Future<bool> register(String name, String email, String password) async {
@@ -59,16 +78,15 @@ class AuthService extends GetxService {
         'password': password,
       });
 
-      return response.statusCode == 201;
+      if (response.statusCode == 201) {
+        // langsung isi data user agar tidak kosong
+        userName.value = name;
+        userEmail.value = email;
+        return true;
+      }
+      return false;
     } catch (e) {
-      rethrow; // <--- WAJIB ADA INI agar controller tau ada error
+      rethrow;
     }
-  }
-
-  Future<void> logout() async {
-    await _storage.deleteAll();
-    isLoggedIn.value = false;
-    userName.value = '';
-    Get.offAllNamed('/login');
   }
 }

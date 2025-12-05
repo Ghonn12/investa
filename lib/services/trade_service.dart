@@ -37,23 +37,22 @@ class TradeService extends GetxService {
   // 2. Fetch Market Stocks (Daftar Saham Populer + Harga) -- INI YANG PENTING
   Future<List<Map<String, dynamic>>> getMarketStocks() async {
     try {
-      // Pastikan URL ini benar: /api/market/stocks
       final response = await _api.get(ApiConstants.marketStocks);
 
-      log("Market API Response Status: ${response.statusCode}");
-
       if (response.statusCode == 200) {
-        // JSON Struktur: { "data": [ {symbol: "...", price: 8400}, ... ] }
         final List rawList = response.data['data'];
 
-        log("Market Data Count: ${rawList.length}");
-
+        // KRITIS: Pastikan semua field (price, change_percent, is_up) ada
         return List<Map<String, dynamic>>.from(rawList);
       }
       return [];
     } catch (e) {
       log('Error fetching market stocks: $e');
-      return []; // Return kosong biar gak crash, tapi cek log console
+      // Penting: Di Dio, error 401/403 akan di-rethrow, jadi catch ini menangani error parsing/network lain
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) rethrow; // Biarkan interceptor handle
+      }
+      return [];
     }
   }
 
