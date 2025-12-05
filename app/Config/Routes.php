@@ -6,31 +6,53 @@ use CodeIgniter\Router\RouteCollection;
  * @var RouteCollection $routes
  */
 
-// CORS Preflight (Agar Flutter bisa akses jika debug di Web)
+// CORS Preflight
 $routes->options('(:any)', function() {});
 
-// Auth Routes (Public)
+// --- AUTH ROUTES (Public) ---
+// Karena AuthController ada di 'App\Controllers', panggil langsung tanpa prefix.
 $routes->post('auth/register', 'AuthController::register');
-$routes->post('auth/login', 'AuthController::login');
+$routes->post('auth/login',    'AuthController::login');
 
-// Protected Routes (Butuh Token)
+
+// --- PROTECTED ROUTES (Butuh Token) ---
+// Group API Default (Untuk Controller temanmu yang pakai prefix manual 'Api\...')
 $routes->group('api', ['filter' => 'authFilter'], function($routes) {
-    // AI Chat
+    
+    // Fitur Temanmu (AI & Trading)
+    // Di sini temanmu menulis 'Api\AiController', jadi ini akan mencari di folder Api
     $routes->post('chat', 'Api\AiController::chat');
-    $routes->get('test-ai', 'Api\AiController::testConnection'); // <-- Tambahkan ini
+    $routes->get('test-ai', 'Api\AiController::testConnection');
 
     $routes->get('finance', 'Api\FinanceController::index');
-    $routes->post('finance', 'Api\FinanceController::create'); // Tambah Income/Expense
+    $routes->post('finance', 'Api\FinanceController::create');
 
-    // Trading (Saham/Crypto)
     $routes->get('portfolio', 'Api\TradeController::portfolio');
-    $routes->post('trade/buy', 'Api\TradeController::buy');  // Beli Saham
-    $routes->post('trade/sell', 'Api\TradeController::sell'); // Jual Saham (BARU)
-
+    $routes->post('trade/buy', 'Api\TradeController::buy');
+    $routes->post('trade/sell', 'Api\TradeController::sell');
     $routes->get('market/price', 'Api\TradeController::getPrice');
     $routes->get('market/stocks', 'Api\TradeController::getMarketStocks');
 });
 
+// --- FITUR SAKUKU (Finance Kita) ---
+// Kita buat group khusus yang otomatis menambahkan namespace 'App\Controllers\Api'
+// Jadi di dalamnya kita TIDAK PERLU nulis 'Api\' lagi.
+$routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'authFilter'], function($routes) {
+    
+    // CRUD Wallet
+    $routes->resource('wallet', ['controller' => 'WalletController']);
+    
+    // CRUD Kategori
+    $routes->resource('kategori', ['controller' => 'KategoriController']);
+    
+    // CRUD Transaksi
+    $routes->resource('transaksi', ['controller' => 'TransaksiController']);
+    
+    // Dashboard
+    $routes->get('dashboard/summary', 'DashboardController::summary');
+});
+
+// --- ADMIN ROUTES ---
 $routes->group('api/admin', ['filter' => 'authFilter'], function($routes) {
     $routes->get('dashboard', 'Api\AdminController::dashboard');
     $routes->get('user-growth', 'Api\AdminController::getUserGrowth');
