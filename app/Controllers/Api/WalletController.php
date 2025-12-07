@@ -13,40 +13,10 @@ class WalletController extends ResourceController
     protected $modelName = 'App\Models\WalletModel';
     protected $format    = 'json';
 
-    /**
-     * Helper untuk validasi token JWT dan mengambil User ID
-     */
-    private function getLoggedInUserId()
-    {
-        $key = getenv('JWT_SECRET');
-        $header = $this->request->getHeaderLine('Authorization');
-        $token = null;
-
-        // Ambil token dari header Bearer
-        if (!empty($header)) {
-            if (preg_match('/Bearer\s(\S+)/', $header, $matches)) {
-                $token = $matches[1];
-            }
-        }
-
-        if (is_null($token)) {
-            $this->failUnauthorized('Akses ditolak. Token diperlukan.');
-            exit; 
-        }
-
-        try {
-            $decoded = JWT::decode($token, new Key($key, 'HS256'));
-            return $decoded->uid;
-        } catch (Exception $e) {
-            $this->failUnauthorized('Token tidak valid atau kedaluwarsa.');
-            exit;
-        }
-    }
-
     // GET all Wallets
     public function index()
     {
-        $userId = $this->getLoggedInUserId();
+        $userId = $this->request->user_id;
         // Ambil wallet milik user ini
         $data = $this->model->where('user_id', $userId)->findAll();
         
@@ -60,7 +30,7 @@ class WalletController extends ResourceController
     // CREATE Wallet (POST)
     public function create()
     {
-        $userId = $this->getLoggedInUserId();
+        $userId = $this->request->user_id;
         
         // PENTING: Gunakan getPost() untuk POST form-data
         $data = $this->request->getPost(); 
@@ -103,7 +73,7 @@ class WalletController extends ResourceController
     // UPDATE Wallet (PUT)
     public function update($id = null)
     {
-        $userId = $this->getLoggedInUserId();
+        $userId = $this->request->user_id;
         
         // PENTING: Gunakan getRawInput() untuk method PUT
         $data = $this->request->getRawInput(); 
@@ -133,7 +103,7 @@ class WalletController extends ResourceController
     // DELETE Wallet
     public function delete($id = null)
     {
-        $userId = $this->getLoggedInUserId();
+        $userId = $this->request->user_id;
 
         // Cek kepemilikan data
         $wallet = $this->model->where('id', $id)->where('user_id', $userId)->first();

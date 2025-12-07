@@ -12,64 +12,70 @@ class DashboardController extends ResourceController
 {
     use ResponseTrait;
 
-    private function getLoggedInUserId() {
-        $key = getenv('JWT_SECRET');
-        $header = $this->request->getHeaderLine('Authorization');
-        if (!empty($header) && preg_match('/Bearer\s(\S+)/', $header, $matches)) {
-            try {
-                $decoded = JWT::decode($matches[1], new Key($key, 'HS256'));
-                return $decoded->uid;
-            } catch (Exception $e) { return null; }
-        }
-        return null;
-    }
-
     public function summary() {
-        $userId = $this->getLoggedInUserId();
-        if(!$userId) return $this->failUnauthorized();
+        $userId = $this->request->user_id;
 
         $transaksiModel = new TransaksiModel();
         $walletModel = new WalletModel();
 
-        // 1. Rekap Kategori (Untuk Pie Chart)
+        // 1. Rekap Kategori (Untuk Pie Chart - Pengeluaran Bulan Ini)
         $pengeluaranKategori = $transaksiModel
             ->select('categories.nama_kategori, SUM(transactions.amount) as total')
             ->join('categories', 'categories.id = transactions.category_id')
             ->where('transactions.user_id', $userId)
-            ->where('transactions.type', 'Pengeluaran') // atau EXPENSE
+            ->where('transactions.type', 'Pengeluaran') 
             ->where('MONTH(transactions.date)', date('m'))
             ->where('YEAR(transactions.date)', date('Y'))
             ->groupBy('categories.nama_kategori')
             ->findAll();
 
-        // 2. Rekap Saldo Wallet
+        // 2. Hitung Saldo Tiap Wallet
         $wallets = $walletModel->where('user_id', $userId)->findAll();
-        $saldoPerWallet = [];
+        
+        $totalCash = 0;
+        $totalRekening = 0;
 
         foreach ($wallets as $wallet) {
+            // Hitung Income
             $pemasukan = $transaksiModel
                 ->where('user_id', $userId)
                 ->where('wallet_id', $wallet['id'])
-                ->where('type', 'Pemasukan')
+                ->groupStart() // (Pemasukan OR INCOME)
+                    ->where('type', 'Pemasukan')
+                    ->orWhere('type', 'INCOME')
+                ->groupEnd()
                 ->selectSum('amount')->get()->getRow()->amount ?? 0;
 
+            // Hitung Expense
             $pengeluaran = $transaksiModel
                 ->where('user_id', $userId)
                 ->where('wallet_id', $wallet['id'])
-                ->where('type', 'Pengeluaran')
+                ->groupStart() 
+                    ->where('type', 'Pengeluaran')
+                    ->orWhere('type', 'EXPENSE')
+                    ->orWhere('type', 'Penarikan') // Support Penarikan as Expense
+                ->groupEnd()
                 ->selectSum('amount')->get()->getRow()->amount ?? 0;
             
-            $saldoPerWallet[] = [
-                'nama' => $wallet['nama_wallet'],
-                'saldo' => $pemasukan - $pengeluaran
-            ];
+            $saldo = $pemasukan - $pengeluaran;
+
+            // Klasifikasi Cash vs Rekening
+            // Kita asumsikan jika nama wallet mengandung 'Cash' atau tipe 'Cash'
+            $isCash = stripos($wallet['nama_wallet'], 'Cash') !== false || stripos($wallet['tipe_wallet'], 'Cash') !== false;
+
+            if ($isCash) {
+                $totalCash += $saldo;
+            } else {
+                $totalRekening += $saldo;
+            }
         }
 
         return $this->respond([
             'success' => true,
             'data' => [
-                'saldo_per_wallet' => $saldoPerWallet,
-                'pengeluaran_per_kategori' => $pengeluaranKategori
+                'total_cash' => $totalCash,
+                'total_rekening' => $totalRekening,
+                'pie_chart' => $pengeluaranKategori
             ]
         ]);
     }

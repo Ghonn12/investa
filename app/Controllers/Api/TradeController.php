@@ -4,8 +4,10 @@ namespace App\Controllers\Api;
 
 use App\Controllers\ApiController;
 use App\Models\PortfolioModel;
-use App\Models\UserModel;
+// use App\Models\UserModel; // Removed dependency on global user balance
 use App\Libraries\MarketService;
+use App\Models\WalletModel;
+use App\Models\TransaksiModel;
 
 class TradeController extends ApiController
 {
@@ -16,9 +18,6 @@ class TradeController extends ApiController
         $model = new PortfolioModel();
         $portfolios = $model->where('user_id', $userId)->findAll();
         
-        $userModel = new UserModel();
-        $user = $userModel->find($userId);
-
         $marketService = new MarketService();
         $enrichedData = [];
         $totalPortfolioValue = 0;
@@ -55,10 +54,13 @@ class TradeController extends ApiController
             ];
         }
         
+        // Hitung Total Cash Balance dari Transaksi
+        $cashBalance = $this->getUserCashBalance($userId);
+        
         return $this->success([
-            'cash_balance' => (float)$user['balance'],
+            'cash_balance' => $cashBalance,
             'portfolio_value' => $totalPortfolioValue,
-            'net_worth' => (float)$user['balance'] + $totalPortfolioValue,
+            'net_worth' => $cashBalance + $totalPortfolioValue,
             'holdings' => $enrichedData
         ]);
     }
@@ -68,14 +70,27 @@ class TradeController extends ApiController
     {
         $rules = [
             'symbol' => 'required', 
-            'quantity' => 'required|numeric'
+            'quantity' => 'required|numeric|greater_than[0]',
+            'wallet_id' => 'required|numeric' // New Requirement
         ];
         if (!$this->validate($rules)) return $this->error($this->validator->getErrors());
 
         $symbol = strtoupper($this->request->getVar('symbol'));
         $qty = (float)$this->request->getVar('quantity');
+        $walletId = $this->request->getVar('wallet_id');
         $userId = $this->request->user_id;
 
+        // 1. Validasi Wallet Milik User
+        $walletModel = new WalletModel();
+        $wallet = $walletModel->where('id', $walletId)->where('user_id', $userId)->first();
+        if (!$wallet) {
+            return $this->error("Wallet tidak ditemukan atau bukan milik Anda.");
+        }
+
+        // 2. Hitung Saldo Wallet (Dynamic Calculation)
+        $currentBalance = $this->getWalletBalance($userId, $walletId);
+
+        // 3. Ambil Harga Pasar
         $marketService = new MarketService();
         $currentPrice = $marketService->getPrice($symbol);
 
@@ -85,22 +100,30 @@ class TradeController extends ApiController
 
         $totalCost = $currentPrice * $qty;
 
-        $userModel = new UserModel();
+        if ($currentBalance < $totalCost) {
+            return $this->error("Saldo Wallet tidak cukup. Butuh: " . number_format($totalCost, 0) . ", Ada: " . number_format($currentBalance, 0));
+        }
+
         $portfolioModel = new PortfolioModel();
+        $trxModel = new TransaksiModel();
         
         $db = \Config\Database::connect();
         $db->transStart();
 
         try {
-            $user = $userModel->find($userId);
-            if ((float)$user['balance'] < $totalCost) {
-                return $this->error("Saldo tidak cukup. Butuh: $totalCost, Punya: {$user['balance']}");
-            }
+            // A. Catat Transaksi Pengeluaran (Investasi)
+            $trxModel->insert([
+                'user_id' => $userId,
+                'wallet_id' => $walletId,
+                'category_id' => null, // Atau set ID kategori Investasi jika ada
+                'amount' => $totalCost,
+                'type' => 'Pengeluaran', // Mengurangi saldo wallet
+                'title' => "Beli Saham $symbol",
+                'deskripsi' => "Investasi $symbol x $qty lembar @ $currentPrice",
+                'date' => date('Y-m-d H:i:s')
+            ]);
 
-            // Kurangi Saldo
-            $userModel->update($userId, ['balance' => (float)$user['balance'] - $totalCost]);
-
-            // Update Portfolio (Average Down)
+            // B. Update Portfolio (Average Down)
             $existing = $portfolioModel->where('user_id', $userId)->where('symbol', $symbol)->first();
 
             if ($existing) {
@@ -130,7 +153,7 @@ class TradeController extends ApiController
                 'quantity_bought' => $qty,
                 'price' => $currentPrice,
                 'total_cost' => $totalCost,
-                'remaining_balance' => (float)$user['balance'] - $totalCost
+                'wallet_remaining_balance' => $currentBalance - $totalCost
             ], "Berhasil membeli $symbol");
 
         } catch (\Exception $e) {
@@ -145,13 +168,22 @@ class TradeController extends ApiController
         // 1. Validasi
         $rules = [
             'symbol' => 'required',
-            'quantity' => 'required|numeric'
+            'quantity' => 'required|numeric|greater_than[0]',
+            'wallet_id' => 'required|numeric' // New: Uang hasil jual masuk ke wallet mana?
         ];
         if (!$this->validate($rules)) return $this->error($this->validator->getErrors());
 
         $symbol = strtoupper($this->request->getVar('symbol'));
         $qtyToSell = (float)$this->request->getVar('quantity');
+        $walletId = $this->request->getVar('wallet_id');
         $userId = $this->request->user_id;
+
+        // Validasi Wallet
+        $walletModel = new WalletModel();
+        $wallet = $walletModel->where('id', $walletId)->where('user_id', $userId)->first();
+        if (!$wallet) {
+            return $this->error("Wallet tidak ditemukan.");
+        }
 
         // 2. Cek apakah User punya asetnya
         $portfolioModel = new PortfolioModel();
@@ -171,22 +203,28 @@ class TradeController extends ApiController
         $currentPrice = $marketService->getPrice($symbol);
         
         if (!$currentPrice) {
-             // Jika gagal ambil harga, gagalkan transaksi agar aman
              return $this->error("Gagal mengambil harga pasar saat ini. Transaksi dibatalkan.");
         }
 
         // 4. Hitung Penerimaan (Revenue)
         $totalRevenue = $currentPrice * $qtyToSell;
 
-        $userModel = new UserModel();
+        $trxModel = new TransaksiModel();
         $db = \Config\Database::connect();
         $db->transStart();
 
         try {
-            // A. Tambah Saldo User
-            $user = $userModel->find($userId);
-            $newBalance = (float)$user['balance'] + $totalRevenue;
-            $userModel->update($userId, ['balance' => $newBalance]);
+            // A. Catat Transaksi Pemasukan (Divestasi/Profit) ke Wallet
+            $trxModel->insert([
+                'user_id' => $userId,
+                'wallet_id' => $walletId,
+                'category_id' => null,
+                'amount' => $totalRevenue,
+                'type' => 'Pemasukan', // Menambah saldo wallet
+                'title' => "Jual Saham $symbol",
+                'deskripsi' => "Jual $symbol x $qtyToSell lembar @ $currentPrice",
+                'date' => date('Y-m-d H:i:s')
+            ]);
 
             // B. Update Portfolio
             $remainingQty = $currentQty - $qtyToSell;
@@ -196,7 +234,6 @@ class TradeController extends ApiController
                 $portfolioModel->delete($existing['id']);
             } else {
                 // Jika masih ada sisa, update quantity saja
-                // PENTING: Saat Jual, Average Price TIDAK BERUBAH
                 $portfolioModel->update($existing['id'], [
                     'quantity' => $remainingQty
                 ]);
@@ -209,7 +246,6 @@ class TradeController extends ApiController
                 'quantity_sold' => $qtyToSell,
                 'price_at_sell' => $currentPrice,
                 'total_revenue' => $totalRevenue,
-                'new_balance' => $newBalance
             ], "Berhasil menjual $symbol");
 
         } catch (\Exception $e) {
@@ -217,6 +253,7 @@ class TradeController extends ApiController
             return $this->error($e->getMessage(), 500);
         }
     }
+
     public function getPrice()
     {
         $symbol = strtoupper($this->request->getVar('symbol'));
@@ -238,6 +275,7 @@ class TradeController extends ApiController
             'timestamp' => date('Y-m-d H:i:s')
         ]);
     }
+
     public function getMarketStocks()
     {
         // Daftar simbol saham populer yang ingin ditampilkan
@@ -250,22 +288,19 @@ class TradeController extends ApiController
         $stockData = [];
 
         foreach ($symbols as $symbol) {
-            // Panggil MarketService untuk setiap simbol
-            // (Idealnya ini di-cache atau di-batch request jika API mendukung, tapi untuk sekarang loop ok)
             $price = $marketService->getPrice($symbol);
             
             $stockData[] = [
                 'symbol' => $symbol,
-                'name'   => $this->getCompanyName($symbol), // Helper function sederhana
+                'name'   => $this->getCompanyName($symbol), 
                 'price'  => $price,
-                // 'change' => ... (bisa ditambahkan jika MarketService support)
             ];
         }
 
         return $this->success($stockData);
     }
 
-    // Helper sederhana untuk nama perusahaan (bisa dipindah ke Model/Config)
+    // Helper sederhana untuk nama perusahaan
     private function getCompanyName($symbol) {
         $names = [
             'BBCA.JK' => 'Bank Central Asia',
@@ -278,5 +313,59 @@ class TradeController extends ApiController
             'ETH-USD' => 'Ethereum'
         ];
         return $names[$symbol] ?? $symbol;
+    }
+
+    // Helper: Hitung Total Cash User (Sum Semua Wallet)
+    private function getUserCashBalance($userId) {
+        $trxModel = new TransaksiModel();
+
+        // Sum Income
+        $pemasukan = $trxModel
+            ->where('user_id', $userId)
+            ->groupStart()
+                ->where('type', 'Pemasukan')
+                ->orWhere('type', 'INCOME')
+            ->groupEnd()
+            ->selectSum('amount')->get()->getRow()->amount ?? 0;
+
+        // Sum Expense
+        $pengeluaran = $trxModel
+            ->where('user_id', $userId)
+            ->groupStart() 
+                ->where('type', 'Pengeluaran')
+                ->orWhere('type', 'EXPENSE')
+                ->orWhere('type', 'Penarikan')
+            ->groupEnd()
+            ->selectSum('amount')->get()->getRow()->amount ?? 0;
+
+        return $pemasukan - $pengeluaran;
+    }
+
+    // Private Helper: Calculate Wallet Balance Dynamically
+    private function getWalletBalance($userId, $walletId) {
+        $trxModel = new TransaksiModel();
+
+        // Sum Income
+        $pemasukan = $trxModel
+            ->where('user_id', $userId)
+            ->where('wallet_id', $walletId)
+            ->groupStart()
+                ->where('type', 'Pemasukan')
+                ->orWhere('type', 'INCOME')
+            ->groupEnd()
+            ->selectSum('amount')->get()->getRow()->amount ?? 0;
+
+        // Sum Expense
+        $pengeluaran = $trxModel
+            ->where('user_id', $userId)
+            ->where('wallet_id', $walletId)
+            ->groupStart() 
+                ->where('type', 'Pengeluaran')
+                ->orWhere('type', 'EXPENSE')
+                ->orWhere('type', 'Penarikan')
+            ->groupEnd()
+            ->selectSum('amount')->get()->getRow()->amount ?? 0;
+
+        return $pemasukan - $pengeluaran;
     }
 }

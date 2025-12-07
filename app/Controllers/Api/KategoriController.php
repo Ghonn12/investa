@@ -13,39 +13,10 @@ class KategoriController extends ResourceController
     protected $modelName = 'App\Models\KategoriModel';
     protected $format    = 'json';
 
-    /**
-     * Helper untuk validasi token JWT dan mengambil User ID
-     */
-    private function getLoggedInUserId()
-    {
-        $key = getenv('JWT_SECRET');
-        $header = $this->request->getHeaderLine('Authorization');
-        $token = null;
-
-        if (!empty($header)) {
-            if (preg_match('/Bearer\s(\S+)/', $header, $matches)) {
-                $token = $matches[1];
-            }
-        }
-
-        if (is_null($token)) {
-            $this->failUnauthorized('Akses ditolak. Token diperlukan.');
-            exit; 
-        }
-
-        try {
-            $decoded = JWT::decode($token, new Key($key, 'HS256'));
-            return $decoded->uid;
-        } catch (Exception $e) {
-            $this->failUnauthorized('Token tidak valid atau kedaluwarsa.');
-            exit;
-        }
-    }
-
     // GET all Categories
     public function index()
     {
-        $userId = $this->getLoggedInUserId();
+        $userId = $this->request->user_id;
         $data = $this->model->where('user_id', $userId)->findAll();
         
         return $this->respond([
@@ -58,7 +29,7 @@ class KategoriController extends ResourceController
     // CREATE Kategori (POST)
     public function create()
     {
-        $userId = $this->getLoggedInUserId();
+        $userId = $this->request->user_id;
         
         // PENTING: Gunakan getPost() untuk POST form-data
         $data = $this->request->getPost(); 
@@ -102,7 +73,7 @@ class KategoriController extends ResourceController
     // UPDATE Kategori (PUT)
     public function update($id = null)
     {
-        $userId = $this->getLoggedInUserId();
+        $userId = $this->request->user_id;
         
         // PENTING: Gunakan getRawInput() untuk method PUT
         $data = $this->request->getRawInput(); 
@@ -132,7 +103,7 @@ class KategoriController extends ResourceController
     // DELETE Kategori
     public function delete($id = null)
     {
-        $userId = $this->getLoggedInUserId();
+        $userId = $this->request->user_id;
 
         // Cek kepemilikan
         $kategori = $this->model->where('id', $id)->where('user_id', $userId)->first();

@@ -11,8 +11,8 @@ $routes->options('(:any)', function() {});
 
 // --- AUTH ROUTES (Public) ---
 // Karena AuthController ada di 'App\Controllers', panggil langsung tanpa prefix.
-$routes->post('auth/register', 'AuthController::register');
-$routes->post('auth/login',    'AuthController::login');
+$routes->post('auth/register', '\App\Controllers\AuthController::register');
+$routes->post('auth/login',    '\App\Controllers\AuthController::login');
 
 
 // --- PROTECTED ROUTES (Butuh Token) ---
@@ -50,6 +50,13 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'authFi
     
     // Dashboard
     $routes->get('dashboard/summary', 'DashboardController::summary');
+
+    // User Management
+    $routes->group('user', function($routes) {
+        $routes->get('profile', 'UserController::profile');
+        $routes->put('profile', 'UserController::updateProfile');
+        $routes->put('password', 'UserController::changePassword');
+    });
 });
 
 // --- ADMIN ROUTES ---
