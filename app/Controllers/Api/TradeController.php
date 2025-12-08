@@ -17,7 +17,7 @@ class TradeController extends ApiController
         $userId = $this->request->user_id;
         $model = new PortfolioModel();
         $portfolios = $model->where('user_id', $userId)->findAll();
-        
+
         $marketService = new MarketService();
         $enrichedData = [];
         $totalPortfolioValue = 0;
@@ -26,18 +26,18 @@ class TradeController extends ApiController
             // 1. Ambil harga pasar terbaru
             $currentPrice = $marketService->getPrice($item['symbol']);
             if (!$currentPrice) {
-                $currentPrice = (float)$item['average_price'];
+                $currentPrice = (float) $item['average_price'];
             }
 
             // 2. Hitung Profit/Loss
-            $qty = (float)$item['quantity'];
-            $avgPrice = (float)$item['average_price'];
+            $qty = (float) $item['quantity'];
+            $avgPrice = (float) $item['average_price'];
 
             $currentValue = $qty * $currentPrice;
             $investmentValue = $qty * $avgPrice;
-            
+
             $pnl = $currentValue - $investmentValue;
-            
+
             $pnlPercent = ($investmentValue > 0) ? ($pnl / $investmentValue) * 100 : 0;
 
             $totalPortfolioValue += $currentValue;
@@ -53,10 +53,10 @@ class TradeController extends ApiController
                 'pnl_percent' => round($pnlPercent, 2)
             ];
         }
-        
+
         // Hitung Total Cash Balance dari Transaksi
         $cashBalance = $this->getUserCashBalance($userId);
-        
+
         return $this->success([
             'cash_balance' => $cashBalance,
             'portfolio_value' => $totalPortfolioValue,
@@ -69,14 +69,15 @@ class TradeController extends ApiController
     public function buy()
     {
         $rules = [
-            'symbol' => 'required', 
+            'symbol' => 'required',
             'quantity' => 'required|numeric|greater_than[0]',
             'wallet_id' => 'required|numeric' // New Requirement
         ];
-        if (!$this->validate($rules)) return $this->error($this->validator->getErrors());
+        if (!$this->validate($rules))
+            return $this->error($this->validator->getErrors());
 
         $symbol = strtoupper($this->request->getVar('symbol'));
-        $qty = (float)$this->request->getVar('quantity');
+        $qty = (float) $this->request->getVar('quantity');
         $walletId = $this->request->getVar('wallet_id');
         $userId = $this->request->user_id;
 
@@ -106,7 +107,7 @@ class TradeController extends ApiController
 
         $portfolioModel = new PortfolioModel();
         $trxModel = new TransaksiModel();
-        
+
         $db = \Config\Database::connect();
         $db->transStart();
 
@@ -127,9 +128,9 @@ class TradeController extends ApiController
             $existing = $portfolioModel->where('user_id', $userId)->where('symbol', $symbol)->first();
 
             if ($existing) {
-                $oldQty = (float)$existing['quantity'];
-                $oldAvg = (float)$existing['average_price'];
-                
+                $oldQty = (float) $existing['quantity'];
+                $oldAvg = (float) $existing['average_price'];
+
                 $newTotalQty = $oldQty + $qty;
                 $newAvgPrice = (($oldQty * $oldAvg) + ($qty * $currentPrice)) / $newTotalQty;
 
@@ -171,10 +172,11 @@ class TradeController extends ApiController
             'quantity' => 'required|numeric|greater_than[0]',
             'wallet_id' => 'required|numeric' // New: Uang hasil jual masuk ke wallet mana?
         ];
-        if (!$this->validate($rules)) return $this->error($this->validator->getErrors());
+        if (!$this->validate($rules))
+            return $this->error($this->validator->getErrors());
 
         $symbol = strtoupper($this->request->getVar('symbol'));
-        $qtyToSell = (float)$this->request->getVar('quantity');
+        $qtyToSell = (float) $this->request->getVar('quantity');
         $walletId = $this->request->getVar('wallet_id');
         $userId = $this->request->user_id;
 
@@ -193,7 +195,7 @@ class TradeController extends ApiController
             return $this->error("Anda tidak memiliki aset $symbol");
         }
 
-        $currentQty = (float)$existing['quantity'];
+        $currentQty = (float) $existing['quantity'];
         if ($currentQty < $qtyToSell) {
             return $this->error("Jumlah aset tidak cukup. Punya: $currentQty, Ingin Jual: $qtyToSell");
         }
@@ -201,9 +203,9 @@ class TradeController extends ApiController
         // 3. Cek Harga Pasar
         $marketService = new MarketService();
         $currentPrice = $marketService->getPrice($symbol);
-        
+
         if (!$currentPrice) {
-             return $this->error("Gagal mengambil harga pasar saat ini. Transaksi dibatalkan.");
+            return $this->error("Gagal mengambil harga pasar saat ini. Transaksi dibatalkan.");
         }
 
         // 4. Hitung Penerimaan (Revenue)
@@ -257,7 +259,7 @@ class TradeController extends ApiController
     public function getPrice()
     {
         $symbol = strtoupper($this->request->getVar('symbol'));
-        
+
         if (!$symbol) {
             return $this->error("Parameter 'symbol' wajib diisi", 400);
         }
@@ -278,22 +280,31 @@ class TradeController extends ApiController
 
     public function getMarketStocks()
     {
-        // Daftar simbol saham populer yang ingin ditampilkan
         $symbols = [
-            'BBCA.JK', 'TLKM.JK', 'BBRI.JK', 'BMRI.JK', 
-            'ASII.JK', 'GOTO.JK', 'BTC-USD', 'ETH-USD'
+            'BBCA.JK',
+            'TLKM.JK',
+            'BBRI.JK',
+            'BMRI.JK',
+            'ASII.JK',
+            'GOTO.JK',
+            'BTC-USD',
+            'ETH-USD'
         ];
 
         $marketService = new MarketService();
         $stockData = [];
 
         foreach ($symbols as $symbol) {
-            $price = $marketService->getPrice($symbol);
-            
+            $data = $marketService->getPrice($symbol); // <-- ambil array
+
             $stockData[] = [
                 'symbol' => $symbol,
-                'name'   => $this->getCompanyName($symbol), 
-                'price'  => $price,
+                'name' => $this->getCompanyName($symbol),
+                'price' => $data['price'],
+                'timestamp' => date('Y-m-d H:i:s'),
+                'price_formatted' => number_format($data['price'], 0),
+                'change_percent' => $data['changePercent'],
+                'change_percent_formatted' => number_format($data['changePercent'], 2) . '%'
             ];
         }
 
@@ -301,7 +312,8 @@ class TradeController extends ApiController
     }
 
     // Helper sederhana untuk nama perusahaan
-    private function getCompanyName($symbol) {
+    private function getCompanyName($symbol)
+    {
         $names = [
             'BBCA.JK' => 'Bank Central Asia',
             'TLKM.JK' => 'Telkom Indonesia',
@@ -316,25 +328,26 @@ class TradeController extends ApiController
     }
 
     // Helper: Hitung Total Cash User (Sum Semua Wallet)
-    private function getUserCashBalance($userId) {
+    private function getUserCashBalance($userId)
+    {
         $trxModel = new TransaksiModel();
 
         // Sum Income
         $pemasukan = $trxModel
             ->where('user_id', $userId)
             ->groupStart()
-                ->where('type', 'Pemasukan')
-                ->orWhere('type', 'INCOME')
+            ->where('type', 'Pemasukan')
+            ->orWhere('type', 'INCOME')
             ->groupEnd()
             ->selectSum('amount')->get()->getRow()->amount ?? 0;
 
         // Sum Expense
         $pengeluaran = $trxModel
             ->where('user_id', $userId)
-            ->groupStart() 
-                ->where('type', 'Pengeluaran')
-                ->orWhere('type', 'EXPENSE')
-                ->orWhere('type', 'Penarikan')
+            ->groupStart()
+            ->where('type', 'Pengeluaran')
+            ->orWhere('type', 'EXPENSE')
+            ->orWhere('type', 'Penarikan')
             ->groupEnd()
             ->selectSum('amount')->get()->getRow()->amount ?? 0;
 
@@ -342,7 +355,8 @@ class TradeController extends ApiController
     }
 
     // Private Helper: Calculate Wallet Balance Dynamically
-    private function getWalletBalance($userId, $walletId) {
+    private function getWalletBalance($userId, $walletId)
+    {
         $trxModel = new TransaksiModel();
 
         // Sum Income
@@ -350,8 +364,8 @@ class TradeController extends ApiController
             ->where('user_id', $userId)
             ->where('wallet_id', $walletId)
             ->groupStart()
-                ->where('type', 'Pemasukan')
-                ->orWhere('type', 'INCOME')
+            ->where('type', 'Pemasukan')
+            ->orWhere('type', 'INCOME')
             ->groupEnd()
             ->selectSum('amount')->get()->getRow()->amount ?? 0;
 
@@ -359,10 +373,10 @@ class TradeController extends ApiController
         $pengeluaran = $trxModel
             ->where('user_id', $userId)
             ->where('wallet_id', $walletId)
-            ->groupStart() 
-                ->where('type', 'Pengeluaran')
-                ->orWhere('type', 'EXPENSE')
-                ->orWhere('type', 'Penarikan')
+            ->groupStart()
+            ->where('type', 'Pengeluaran')
+            ->orWhere('type', 'EXPENSE')
+            ->orWhere('type', 'Penarikan')
             ->groupEnd()
             ->selectSum('amount')->get()->getRow()->amount ?? 0;
 

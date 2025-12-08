@@ -37,8 +37,13 @@ class MarketService
 
             $body = json_decode($response->getBody(), true);
 
-            if (isset($body['quoteResponse']['result'][0]['regularMarketPrice'])) {
-                return (float)$body['quoteResponse']['result'][0]['regularMarketPrice'];
+            if (isset($body['quoteResponse']['result'][0])) {
+                $result = $body['quoteResponse']['result'][0];
+
+                return [
+                    'price' => (float) ($result['regularMarketPrice'] ?? 0),
+                    'changePercent' => (float) ($result['regularMarketChangePercent'] ?? 0)
+                ];
             }
 
         } catch (\Exception $e) {
@@ -53,14 +58,34 @@ class MarketService
 
     private function generateMockPrice($symbol)
     {
-        // Harga pura-pura berdasarkan simbol agar konsisten
+        $basePrice = 1000;
         switch ($symbol) {
-            case 'BBCA.JK': return 9200 + rand(-50, 50); // Sekitar 9200
-            case 'TLKM.JK': return 3800 + rand(-20, 20); // Sekitar 3800
-            case 'BBRI.JK': return 5400 + rand(-30, 30); // Sekitar 5400
-            case 'BTC-USD': return 95000 + rand(-100, 100); // Crypto
-            case 'ETH-USD': return 3500 + rand(-50, 50);
-            default: return 1000 + rand(0, 100); // Saham antah berantah
+            case 'BBCA.JK':
+                $basePrice = 9200;
+                break;
+            case 'TLKM.JK':
+                $basePrice = 3800;
+                break;
+            case 'BBRI.JK':
+                $basePrice = 5400;
+                break;
+            case 'BTC-USD':
+                $basePrice = 95000;
+                break;
+            case 'ETH-USD':
+                $basePrice = 3500;
+                break;
+            default:
+                $basePrice = 1000;
+                break;
         }
+
+        $price = $basePrice + rand(-50, 50);
+        $changePercent = rand(-300, 300) / 100.0; // -3.00% s/d +3.00%
+
+        return [
+            'price' => $price,
+            'changePercent' => $changePercent
+        ];
     }
 }
