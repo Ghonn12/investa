@@ -4,7 +4,6 @@ namespace App\Controllers\Api;
 
 use App\Controllers\ApiController;
 use App\Models\PortfolioModel;
-// use App\Models\UserModel; // Removed dependency on global user balance
 use App\Libraries\MarketService;
 use App\Models\WalletModel;
 use App\Models\TransaksiModel;
@@ -23,13 +22,20 @@ class TradeController extends ApiController
         $totalPortfolioValue = 0;
 
         foreach ($portfolios as $item) {
-            // 1. Ambil harga pasar terbaru
-            $currentPrice = $marketService->getPrice($item['symbol']);
-            if (!$currentPrice) {
+            // --- FIX START ---
+            // 1. Ambil data pasar (ini mengembalikan Array)
+            $marketData = $marketService->getPrice($item['symbol']);
+            
+            // 2. Ambil harga spesifik dari array
+            $currentPrice = 0.0;
+            if ($marketData && isset($marketData['price'])) {
+                $currentPrice = (float) $marketData['price'];
+            } else {
+                // Fallback ke harga rata-rata jika gagal ambil data pasar (misal offline)
                 $currentPrice = (float) $item['average_price'];
             }
+            // --- FIX END ---
 
-            // 2. Hitung Profit/Loss
             $qty = (float) $item['quantity'];
             $avgPrice = (float) $item['average_price'];
 
@@ -37,7 +43,8 @@ class TradeController extends ApiController
             $investmentValue = $qty * $avgPrice;
 
             $pnl = $currentValue - $investmentValue;
-
+            
+            // Hindari division by zero
             $pnlPercent = ($investmentValue > 0) ? ($pnl / $investmentValue) * 100 : 0;
 
             $totalPortfolioValue += $currentValue;
@@ -71,7 +78,7 @@ class TradeController extends ApiController
         $rules = [
             'symbol' => 'required',
             'quantity' => 'required|numeric|greater_than[0]',
-            'wallet_id' => 'required|numeric' // New Requirement
+            'wallet_id' => 'required|numeric'
         ];
         if (!$this->validate($rules))
             return $this->error($this->validator->getErrors());
@@ -93,11 +100,19 @@ class TradeController extends ApiController
 
         // 3. Ambil Harga Pasar
         $marketService = new MarketService();
-        $currentPrice = $marketService->getPrice($symbol);
+        
+        // --- FIX START ---
+        // Ambil array data dulu
+        $marketData = $marketService->getPrice($symbol);
 
-        if (!$currentPrice) {
+        // Validasi apakah data ada dan memiliki key 'price'
+        if (!$marketData || !isset($marketData['price'])) {
             return $this->error("Gagal mengambil harga pasar untuk simbol: $symbol.", 400);
         }
+
+        // Extract nilai float dari array
+        $currentPrice = (float) $marketData['price'];
+        // --- FIX END ---
 
         $totalCost = $currentPrice * $qty;
 
@@ -116,9 +131,9 @@ class TradeController extends ApiController
             $trxModel->insert([
                 'user_id' => $userId,
                 'wallet_id' => $walletId,
-                'category_id' => null, // Atau set ID kategori Investasi jika ada
+                'category_id' => null, 
                 'amount' => $totalCost,
-                'type' => 'Pengeluaran', // Mengurangi saldo wallet
+                'type' => 'Pengeluaran',
                 'title' => "Beli Saham $symbol",
                 'deskripsi' => "Investasi $symbol x $qty lembar @ $currentPrice",
                 'date' => date('Y-m-d H:i:s')
@@ -132,6 +147,7 @@ class TradeController extends ApiController
                 $oldAvg = (float) $existing['average_price'];
 
                 $newTotalQty = $oldQty + $qty;
+                // Rumus Average Price baru
                 $newAvgPrice = (($oldQty * $oldAvg) + ($qty * $currentPrice)) / $newTotalQty;
 
                 $portfolioModel->update($existing['id'], [
@@ -170,7 +186,7 @@ class TradeController extends ApiController
         $rules = [
             'symbol' => 'required',
             'quantity' => 'required|numeric|greater_than[0]',
-            'wallet_id' => 'required|numeric' // New: Uang hasil jual masuk ke wallet mana?
+            'wallet_id' => 'required|numeric'
         ];
         if (!$this->validate($rules))
             return $this->error($this->validator->getErrors());
@@ -202,11 +218,17 @@ class TradeController extends ApiController
 
         // 3. Cek Harga Pasar
         $marketService = new MarketService();
-        $currentPrice = $marketService->getPrice($symbol);
+        
+        // --- FIX START ---
+        $marketData = $marketService->getPrice($symbol);
 
-        if (!$currentPrice) {
+        if (!$marketData || !isset($marketData['price'])) {
             return $this->error("Gagal mengambil harga pasar saat ini. Transaksi dibatalkan.");
         }
+        
+        // Extract harga
+        $currentPrice = (float) $marketData['price'];
+        // --- FIX END ---
 
         // 4. Hitung Penerimaan (Revenue)
         $totalRevenue = $currentPrice * $qtyToSell;
@@ -216,13 +238,13 @@ class TradeController extends ApiController
         $db->transStart();
 
         try {
-            // A. Catat Transaksi Pemasukan (Divestasi/Profit) ke Wallet
+            // A. Catat Transaksi Pemasukan
             $trxModel->insert([
                 'user_id' => $userId,
                 'wallet_id' => $walletId,
                 'category_id' => null,
                 'amount' => $totalRevenue,
-                'type' => 'Pemasukan', // Menambah saldo wallet
+                'type' => 'Pemasukan', 
                 'title' => "Jual Saham $symbol",
                 'deskripsi' => "Jual $symbol x $qtyToSell lembar @ $currentPrice",
                 'date' => date('Y-m-d H:i:s')
@@ -265,15 +287,17 @@ class TradeController extends ApiController
         }
 
         $marketService = new MarketService();
-        $price = $marketService->getPrice($symbol);
+        $data = $marketService->getPrice($symbol);
 
-        if (!$price) {
+        if (!$data) {
             return $this->error("Gagal mengambil harga untuk $symbol", 404);
         }
 
+        // --- FIX: Return structured data correctly ---
         return $this->success([
             'symbol' => $symbol,
-            'price' => $price,
+            'price' => $data['price'], // Kirim harga spesifik
+            'change_percent' => $data['changePercent'] ?? 0,
             'timestamp' => date('Y-m-d H:i:s')
         ]);
     }
@@ -295,17 +319,22 @@ class TradeController extends ApiController
         $stockData = [];
 
         foreach ($symbols as $symbol) {
-            $data = $marketService->getPrice($symbol); // <-- ambil array
+            $data = $marketService->getPrice($symbol); 
 
-            $stockData[] = [
-                'symbol' => $symbol,
-                'name' => $this->getCompanyName($symbol),
-                'price' => $data['price'],
-                'timestamp' => date('Y-m-d H:i:s'),
-                'price_formatted' => number_format($data['price'], 0),
-                'change_percent' => $data['changePercent'],
-                'change_percent_formatted' => number_format($data['changePercent'], 2) . '%'
-            ];
+            // Pastikan data valid sebelum akses array key
+            if ($data && isset($data['price'])) {
+                $stockData[] = [
+                    'symbol' => $symbol,
+                    'name' => $this->getCompanyName($symbol),
+                    'price' => $data['price'],
+                    'timestamp' => date('Y-m-d H:i:s'),
+                    'price_formatted' => number_format($data['price'], 0),
+                    'change_percent' => $data['changePercent'],
+                    'change_percent_formatted' => number_format($data['changePercent'], 2) . '%',
+                    // Tambahkan flag is_up untuk UI Flutter (hijau/merah)
+                    'is_up' => $data['changePercent'] >= 0
+                ];
+            }
         }
 
         return $this->success($stockData);
