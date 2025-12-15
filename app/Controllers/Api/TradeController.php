@@ -25,7 +25,7 @@ class TradeController extends ApiController
             // --- FIX START ---
             // 1. Ambil data pasar (ini mengembalikan Array)
             $marketData = $marketService->getPrice($item['symbol']);
-            
+
             // 2. Ambil harga spesifik dari array
             $currentPrice = 0.0;
             if ($marketData && isset($marketData['price'])) {
@@ -43,7 +43,7 @@ class TradeController extends ApiController
             $investmentValue = $qty * $avgPrice;
 
             $pnl = $currentValue - $investmentValue;
-            
+
             // Hindari division by zero
             $pnlPercent = ($investmentValue > 0) ? ($pnl / $investmentValue) * 100 : 0;
 
@@ -100,14 +100,17 @@ class TradeController extends ApiController
 
         // 3. Ambil Harga Pasar
         $marketService = new MarketService();
-        
-        // --- FIX START ---
-        // Ambil array data dulu
-        $marketData = $marketService->getPrice($symbol);
+
+        try {
+            $marketData = $marketService->getPrice($symbol);
+        } catch (\Exception $e) {
+            // Jika koneksi ke API saham gagal, return error JSON bersih (bukan HTML crash)
+            return $this->error("Gagal koneksi ke data pasar: " . $e->getMessage());
+        }
 
         // Validasi apakah data ada dan memiliki key 'price'
         if (!$marketData || !isset($marketData['price'])) {
-            return $this->error("Gagal mengambil harga pasar untuk simbol: $symbol.", 400);
+            return $this->error("Gagal mengambil harga pasar untuk simbol: $symbol (Data Kosong)", 400);
         }
 
         // Extract nilai float dari array
@@ -131,7 +134,7 @@ class TradeController extends ApiController
             $trxModel->insert([
                 'user_id' => $userId,
                 'wallet_id' => $walletId,
-                'category_id' => null, 
+                'category_id' => null,
                 'amount' => $totalCost,
                 'type' => 'Pengeluaran',
                 'title' => "Beli Saham $symbol",
@@ -218,14 +221,14 @@ class TradeController extends ApiController
 
         // 3. Cek Harga Pasar
         $marketService = new MarketService();
-        
+
         // --- FIX START ---
         $marketData = $marketService->getPrice($symbol);
 
         if (!$marketData || !isset($marketData['price'])) {
             return $this->error("Gagal mengambil harga pasar saat ini. Transaksi dibatalkan.");
         }
-        
+
         // Extract harga
         $currentPrice = (float) $marketData['price'];
         // --- FIX END ---
@@ -244,7 +247,7 @@ class TradeController extends ApiController
                 'wallet_id' => $walletId,
                 'category_id' => null,
                 'amount' => $totalRevenue,
-                'type' => 'Pemasukan', 
+                'type' => 'Pemasukan',
                 'title' => "Jual Saham $symbol",
                 'deskripsi' => "Jual $symbol x $qtyToSell lembar @ $currentPrice",
                 'date' => date('Y-m-d H:i:s')
@@ -319,7 +322,7 @@ class TradeController extends ApiController
         $stockData = [];
 
         foreach ($symbols as $symbol) {
-            $data = $marketService->getPrice($symbol); 
+            $data = $marketService->getPrice($symbol);
 
             // Pastikan data valid sebelum akses array key
             if ($data && isset($data['price'])) {
