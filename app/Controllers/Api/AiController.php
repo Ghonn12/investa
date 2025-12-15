@@ -23,18 +23,19 @@ class AiController extends ApiController
         if (empty($userMessage)) {
             return $this->error("Field 'message' is required", 400);
         }
-        
+
         // 2. API KEY SETUP
         $apiKey = getenv('GEMINI_API_KEY');
-        if (!$apiKey) return $this->error('Server config error: API Key missing', 500);
+        if (!$apiKey)
+            return $this->error('Server config error: API Key missing', 500);
 
         // 3. SETUP MODEL (Gunakan Model yang Valid)
         // Opsi: 'gemini-1.5-flash' (Stabil & Cepat) atau 'gemini-1.5-pro' (Lebih pinter tapi mahal)
         // 'gemini-2.5-flash' BELUM ADA.
-        $modelName = 'gemini-1.5-flash'; 
-        
+        $modelName = 'gemini-1.5-flash';
+
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key=" . rawurlencode($apiKey);
-        
+
         $systemInstruction = "Kamu adalah 'Investa Assistant', asisten keuangan cerdas. Jawablah pertanyaan seputar saham, crypto, dan tips keuangan dengan ramah, singkat, dan gunakan format Markdown yang rapi dalam Bahasa Indonesia.";
 
         // Payload
@@ -61,12 +62,13 @@ class AiController extends ApiController
             $response = $client->post($url, [
                 'headers' => ['Content-Type' => 'application/json'],
                 'json' => $body,
-                'http_errors' => false, // Biar kita bisa handle error code manual
-                'timeout' => 30 // Mencegah loading selamanya
+                'http_errors' => false,
+                'timeout' => 30,
+                'verify' => false // <--- TAMBAHKAN INI (Bypass SSL Check)
             ]);
 
             $result = json_decode($response->getBody(), true);
-            
+
             // Cek Error dari Google
             if ($response->getStatusCode() !== 200) {
                 // Ambil pesan error spesifik dari Google
@@ -76,7 +78,7 @@ class AiController extends ApiController
 
             // Ambil Balasan
             $reply = $result['candidates'][0]['content']['parts'][0]['text'] ?? 'Maaf, saya tidak dapat memproses jawaban saat ini.';
-            
+
             return $this->success(['reply' => $reply]);
 
         } catch (\Exception $e) {
@@ -88,7 +90,8 @@ class AiController extends ApiController
     public function testConnection()
     {
         $apiKey = getenv('GEMINI_API_KEY');
-        if (!$apiKey) return $this->error('API Key missing', 500);
+        if (!$apiKey)
+            return $this->error('API Key missing', 500);
 
         $url = "https://generativelanguage.googleapis.com/v1beta/models?key=" . rawurlencode($apiKey);
 
